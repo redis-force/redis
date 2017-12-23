@@ -128,6 +128,7 @@ typedef void (*RedisModuleTypeRewriteFunc)(RedisModuleIO *aof, RedisModuleString
 typedef size_t (*RedisModuleTypeMemUsageFunc)(const void *value);
 typedef void (*RedisModuleTypeDigestFunc)(RedisModuleDigest *digest, void *value);
 typedef void (*RedisModuleTypeFreeFunc)(void *value);
+typedef void (*RedisModuleHashItemFunc)(const char **key, int32_t *ksize, const char **value, int32_t *vsize, int32_t num, void *privdata);
 
 #ifdef REDISMODULE_EXPERIMENTAL_API
 typedef void (*RedisModuleFinalizer)(RedisModuleCtx *context, void *clientData);
@@ -221,6 +222,7 @@ int REDISMODULE_API_FUNC(RedisModule_ZsetRangePrev)(RedisModuleKey *key);
 int REDISMODULE_API_FUNC(RedisModule_ZsetRangeEndReached)(RedisModuleKey *key);
 int REDISMODULE_API_FUNC(RedisModule_HashSet)(RedisModuleKey *key, int flags, ...);
 int REDISMODULE_API_FUNC(RedisModule_HashGet)(RedisModuleKey *key, int flags, ...);
+int REDISMODULE_API_FUNC(RedisModule_HashGetAll)(RedisModuleKey *key, RedisModuleHashItemFunc func, void *privdata);
 int REDISMODULE_API_FUNC(RedisModule_IsKeysPositionRequest)(RedisModuleCtx *ctx);
 void REDISMODULE_API_FUNC(RedisModule_KeyAtPos)(RedisModuleCtx *ctx, int pos);
 unsigned long long REDISMODULE_API_FUNC(RedisModule_GetClientId)(RedisModuleCtx *ctx);
@@ -366,6 +368,7 @@ static int RedisModule_Init(RedisModuleCtx *ctx, const char *name, int ver, int 
     REDISMODULE_GET_API(ZsetRangeEndReached);
     REDISMODULE_GET_API(HashSet);
     REDISMODULE_GET_API(HashGet);
+    REDISMODULE_GET_API(HashGetAll);
     REDISMODULE_GET_API(IsKeysPositionRequest);
     REDISMODULE_GET_API(KeyAtPos);
     REDISMODULE_GET_API(GetClientId);

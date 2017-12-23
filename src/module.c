@@ -167,6 +167,7 @@ typedef struct RedisModuleKey RedisModuleKey;
 /* Function pointer type of a function representing a command inside
  * a Redis module. */
 typedef int (*RedisModuleCmdFunc) (RedisModuleCtx *ctx, void **argv, int argc);
+typedef void (*RedisModuleHashItemFunc)(const char **key, int32_t *ksize, const char **value, int32_t *vsize, int32_t num, void *privdata);
 
 /* This struct holds the information about a command registered by a module.*/
 struct RedisModuleCommandProxy {
@@ -2290,6 +2291,68 @@ int RM_HashGet(RedisModuleKey *key, int flags, ...) {
     return REDISMODULE_OK;
 }
 
+struct genericHgetallContext {
+    RedisModuleHashItemFunc func;
+    void *privdata;
+};
+
+static void genericHgetallHashTable(void *privdata, const dictEntry **entries, const int size) {
+    struct genericHgetallContext *ctx = privdata;
+    int idx;
+    int32_t klen[16], vlen[16];
+    sds keys[16], values[16];
+    for (idx = 0; idx < size; ++idx) {
+        const dictEntry *de = entries[idx];
+        keys[idx] = dictGetKey(de);
+        values[idx] = dictGetVal(de);
+        klen[idx] = sdslen(keys[idx]);
+        vlen[idx] = sdslen(values[idx]);
+    }
+    ctx->func((const char **)keys,klen,(const char **)values,vlen,size,ctx->privdata);
+}
+
+int RM_HashGetAll(RedisModuleKey *key, RedisModuleHashItemFunc func, void *privdata) {
+    robj *o = key->value;
+    if (o && o->type != OBJ_HASH) return REDISMODULE_ERR;
+
+    if (o->encoding == OBJ_ENCODING_ZIPLIST) {
+        hashTypeIterator *hi = hashTypeInitIterator(o);
+        int32_t klen, vlen;
+        char *key, *value;
+        char kbuffer[32], vbuffer[32];
+        while (hashTypeNext(hi) != C_ERR) {
+            unsigned char *kvstr = NULL, *vvstr = NULL;
+            unsigned int kvlen = UINT_MAX, vvlen = UINT_MAX;
+            long long kvll = LLONG_MAX, vvll = LLONG_MAX;
+            hashTypeCurrentFromZiplist(hi, OBJ_HASH_KEY, &kvstr, &kvlen, &kvll);
+            if (kvstr) {
+                klen = kvlen;
+                key = (char *) kvstr;
+            } else {
+                klen = snprintf(kbuffer, sizeof(kbuffer), "%lld", kvll);
+                key = kbuffer;
+            }
+            hashTypeCurrentFromZiplist(hi, OBJ_HASH_VALUE, &vvstr, &vvlen, &vvll);
+            if (vvstr) {
+                vlen = vvlen;
+                value = (char *) vvstr;
+            } else {
+                vlen = snprintf(vbuffer, sizeof(vbuffer), "%lld", vvll);
+                value = vbuffer;
+            }
+            func((const char **)&key,&klen,(const char **)&value,&vlen,1,privdata);
+        }
+        hashTypeReleaseIterator(hi);
+    } else if (o->encoding == OBJ_ENCODING_HT) {
+        struct genericHgetallContext ctx = {func, privdata};
+        dictEach(o->ptr,genericHgetallHashTable,&ctx);
+    } else {
+        serverPanic("Unknown hash encoding");
+    }
+
+    /* Cleanup */
+    return REDISMODULE_OK;
+}
 /* --------------------------------------------------------------------------
  * Redis <-> Modules generic Call() API
  * -------------------------------------------------------------------------- */
@@ -4446,6 +4509,7 @@ void moduleRegisterCoreAPI(void) {
     REGISTER_API(ZsetRangeEndReached);
     REGISTER_API(HashSet);
     REGISTER_API(HashGet);
+    REGISTER_API(HashGetAll);
     REGISTER_API(IsKeysPositionRequest);
     REGISTER_API(KeyAtPos);
     REGISTER_API(GetClientId);
