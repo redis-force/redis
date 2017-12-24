@@ -258,6 +258,9 @@ void replicationFeedSlaves(list *slaves, int dictid, robj **argv, int argc) {
         /* Don't feed slaves that are still waiting for BGSAVE to start */
         if (slave->replstate == SLAVE_STATE_WAIT_BGSAVE_START) continue;
 
+        /* Don't feed slaves that only require snapshot */
+        if (slave->flags & CLIENT_SLAVE_SNAPSHOT) continue;
+
         /* Feed slaves that are waiting for the initial SYNC (so these commands
          * are queued in the output buffer until the initial SYNC completes),
          * or are already in sync with the master. */
@@ -623,6 +626,11 @@ int startBgsaveForReplication(int mincapa) {
     return retval;
 }
 
+void snapshotCommand(client *c) {
+  c->flags |= CLIENT_SLAVE_SNAPSHOT;
+  syncCommand(c);
+}
+
 /* SYNC and PSYNC command implemenation. */
 void syncCommand(client *c) {
     /* ignore SYNC if already slave or in monitor mode */
@@ -856,6 +864,12 @@ void putSlaveOnline(client *slave) {
     slave->replstate = SLAVE_STATE_ONLINE;
     slave->repl_put_online_on_ack = 0;
     slave->repl_ack_time = server.unixtime; /* Prevent false timeout. */
+    /* slave only requires a snapshot, close the connection to finish */
+    if (slave->flags & CLIENT_SLAVE_SNAPSHOT) {
+        serverLog(LL_NOTICE,"Sending snapshot to slave %s succeeded", replicationGetSlaveName(slave));
+        freeClient(slave);
+        return;
+    }
     if (aeCreateFileEvent(server.el, slave->fd, AE_WRITABLE,
         sendReplyToClient, slave) == AE_ERR) {
         serverLog(LL_WARNING,"Unable to register writable event for slave bulk transfer: %s", strerror(errno));

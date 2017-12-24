@@ -248,6 +248,7 @@ typedef long long mstime_t; /* millisecond time type. */
 #define CLIENT_LUA_DEBUG (1<<25)  /* Run EVAL in debug mode. */
 #define CLIENT_LUA_DEBUG_SYNC (1<<26)  /* EVAL debugging without fork() */
 #define CLIENT_MODULE (1<<27) /* Non connected client used by some module. */
+#define CLIENT_SLAVE_SNAPSHOT (1<<28) /* The client is a slave instance that only require a snapshot */
 
 /* Client block type (btype field in client structure)
  * if CLIENT_BLOCKED flag is set. */
@@ -1880,6 +1881,7 @@ void sdiffCommand(client *c);
 void sdiffstoreCommand(client *c);
 void sscanCommand(client *c);
 void syncCommand(client *c);
+void snapshotCommand(client *c);
 void flushdbCommand(client *c);
 void flushallCommand(client *c);
 void sortCommand(client *c);

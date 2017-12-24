@@ -247,6 +247,7 @@ struct redisCommand redisCommandTable[] = {
     {"sync",syncCommand,1,"ars",0,NULL,0,0,0,0,0},
     {"psync",syncCommand,3,"ars",0,NULL,0,0,0,0,0},
     {"replconf",replconfCommand,-1,"aslt",0,NULL,0,0,0,0,0},
+    {"snapshot",snapshotCommand,1,"ars",0,NULL,0,0,0,0,0},
     {"flushdb",flushdbCommand,-1,"w",0,NULL,0,0,0,0,0},
     {"flushall",flushallCommand,-1,"w",0,NULL,0,0,0,0,0},
     {"sort",sortCommand,-2,"wm",0,sortGetKeys,1,1,1,0,0},
